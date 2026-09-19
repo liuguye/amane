@@ -106,6 +106,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         uncensored: bool | None = None,
         definition: str | None = None,
         content_type: ContentType | None = None,
+        is_strm: bool | None = None,
     ) -> list[MediaFile]:
         """limit None 不分页. ids 为空列表时直接返回空, 不查库. ids 按 SQL_IN_CHUNK_SIZE 分批 IN."""
         id_list = list(ids) if ids is not None else None
@@ -132,6 +133,7 @@ class MediaRepoMixin(RepositoryMixinBase):
                     uncensored=uncensored,
                     definition=definition,
                     content_type=content_type,
+                    is_strm=is_strm,
                 )
 
             if id_list is not None and len(id_list) > SQL_IN_CHUNK_SIZE and limit is None:
@@ -163,6 +165,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         uncensored: bool | None = None,
         definition: str | None = None,
         content_type: ContentType | None = None,
+        is_strm: bool | None = None,
     ) -> int:
         async with self._session() as session:
             base = select(MediaFile)
@@ -180,6 +183,7 @@ class MediaRepoMixin(RepositoryMixinBase):
                 uncensored=uncensored,
                 definition=definition,
                 content_type=content_type,
+                is_strm=is_strm,
             )
             stmt = select(count()).select_from(base.subquery())
             result = await session.exec(stmt)

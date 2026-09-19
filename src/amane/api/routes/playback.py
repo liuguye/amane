@@ -9,12 +9,13 @@ from ...net.errors import SourceError
 from ...playback.factory import SOURCE_ID_MAX_LEN, ListedSource, PlaybackFactory
 from ...playback.file_response import IndexedFileResponse
 from ...playback.hls import PLAYLIST_CACHE_CONTROL, is_hls_content_type
-from ...playback.href import playlist_href, stream_href, subtitle_href
+from ...playback.href import action_href, playlist_href, stream_href, subtitle_href
 from ...playback.proxy import NOSNIFF
 from ...playback.query import playback_query
 from ...plugins.api import PATH_SEGMENT_PATTERN, FilePlaybackTarget, PlaybackQuery, UpstreamPlaybackTarget
 from ..deps import RepoDep, RuntimeDep
 from ..models.playback import (
+    PlaybackActionItem,
     PlaybackSourceListResponse,
     PlaybackSourceOption,
     PlaybackStreamItem,
@@ -77,6 +78,14 @@ def _stream_item(row: ListedSource, metadata_id: int) -> PlaybackStreamItem:
                 href=subtitle_href(row.source_id, metadata_id, row.key, track.id),
             )
             for track in row.subtitles
+        ],
+        actions=[
+            PlaybackActionItem(
+                id=action.id,
+                label=action.label,
+                href=action_href(row.source_id, metadata_id, row.key, action.id),
+            )
+            for action in row.actions
         ],
     )
 
@@ -235,6 +244,29 @@ async def play_stream_subtitle(
     return await _subtitle(request, source_id, metadata_id, key, track_id, repo, runtime)
 
 
+@router.post("/{source_id}/{metadata_id}/actions/{action_id}", status_code=204)
+async def run_metadata_action(
+    source_id: str,
+    metadata_id: Annotated[int, Path(ge=1)],
+    action_id: Annotated[str, Path(pattern=_PATH_SEGMENT_PATTERN)],
+    repo: RepoDep,
+    runtime: RuntimeDep,
+) -> Response:
+    return await _action(source_id, metadata_id, None, action_id, repo, runtime)
+
+
+@router.post("/{source_id}/{metadata_id}/streams/{key}/actions/{action_id}", status_code=204)
+async def run_stream_action(
+    source_id: str,
+    metadata_id: Annotated[int, Path(ge=1)],
+    key: Annotated[str, Path(pattern=_PATH_SEGMENT_PATTERN)],
+    action_id: Annotated[str, Path(pattern=_PATH_SEGMENT_PATTERN)],
+    repo: RepoDep,
+    runtime: RuntimeDep,
+) -> Response:
+    return await _action(source_id, metadata_id, key, action_id, repo, runtime)
+
+
 @router.get("/{source_id}/{metadata_id}")
 async def play_metadata(
     request: Request,
@@ -358,6 +390,25 @@ async def _subtitle(
             headers={**NOSNIFF, "Cache-Control": PLAYLIST_CACHE_CONTROL},
         )
     return await factory.stream.proxy(request, source_id=source_id, target=result, allow="subtitle")
+
+
+async def _action(
+    source_id: str,
+    metadata_id: int,
+    selected_key: str | None,
+    action_id: str,
+    repo: RepoDep,
+    runtime: RuntimeDep,
+) -> Response:
+    factory = await _require_factory(source_id, runtime)
+    query = await _load_query(repo, metadata_id, selected_key)
+    try:
+        await factory.invoke_action(source_id, query, action_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="播放源不存在") from None
+    except SourceError as exc:
+        raise _playback_http_error(exc) from exc
+    return Response(status_code=204)
 
 
 async def _play(

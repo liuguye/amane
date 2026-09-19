@@ -2284,6 +2284,26 @@ export type PathTemplateSchemaResponse = {
 };
 
 /**
+ * PlaybackActionItem
+ *
+ * 流上的一条可选操作. ``label`` 原样来自插件; ``href`` 由主机拼好供 POST.
+ */
+export type PlaybackActionItem = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Href
+     */
+    href: string;
+};
+
+/**
  * PlaybackSourceListResponse
  */
 export type PlaybackSourceListResponse = {
@@ -2353,6 +2373,10 @@ export type PlaybackStreamItem = {
      * Subtitles
      */
     subtitles?: Array<PlaybackSubtitleItem>;
+    /**
+     * Actions
+     */
+    actions?: Array<PlaybackActionItem>;
 };
 
 /**
@@ -3731,6 +3755,12 @@ export type ListMediaData = {
          */
         content_type?: ContentType | null;
         /**
+         * Is Strm
+         *
+         * Filter by path ending with .strm (case-insensitive)
+         */
+        is_strm?: boolean | null;
+        /**
          * Limit
          */
         limit?: number;
@@ -3980,6 +4010,12 @@ export type ListMetadataData = {
          * Filter by linked file content type
          */
         content_type?: ContentType | null;
+        /**
+         * Is Strm
+         *
+         * Filter by linked file path ending with .strm (case-insensitive)
+         */
+        is_strm?: boolean | null;
         /**
          * Saved Query Id
          *
@@ -4570,6 +4606,86 @@ export type PlayStreamSubtitleResponses = {
      */
     200: unknown;
 };
+
+export type RunMetadataActionData = {
+    body?: never;
+    path: {
+        /**
+         * Source Id
+         */
+        source_id: string;
+        /**
+         * Metadata Id
+         */
+        metadata_id: number;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query?: never;
+    url: '/api/playback/{source_id}/{metadata_id}/actions/{action_id}';
+};
+
+export type RunMetadataActionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RunMetadataActionError = RunMetadataActionErrors[keyof RunMetadataActionErrors];
+
+export type RunMetadataActionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RunMetadataActionResponse = RunMetadataActionResponses[keyof RunMetadataActionResponses];
+
+export type RunStreamActionData = {
+    body?: never;
+    path: {
+        /**
+         * Source Id
+         */
+        source_id: string;
+        /**
+         * Metadata Id
+         */
+        metadata_id: number;
+        /**
+         * Key
+         */
+        key: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query?: never;
+    url: '/api/playback/{source_id}/{metadata_id}/streams/{key}/actions/{action_id}';
+};
+
+export type RunStreamActionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RunStreamActionError = RunStreamActionErrors[keyof RunStreamActionErrors];
+
+export type RunStreamActionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RunStreamActionResponse = RunStreamActionResponses[keyof RunStreamActionResponses];
 
 export type PlayMetadataData = {
     body?: never;

@@ -114,6 +114,18 @@ class SubtitleTrack(BaseModel):
     language: str | None = None
 
 
+class PlaybackAction(BaseModel):
+    """``probe`` 声明的一条可选操作; 由用户点按钮触发, 与取流正交.
+
+    ``id`` 进路径, 形状与流 ``key`` 相同. ``label`` 是按钮文案, 原样展示给终端用户.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: PathSegment
+    label: str = Field(min_length=1)
+
+
 class PlaybackOffer(BaseModel):
     """``probe`` 结果里的一条流.
 
@@ -130,6 +142,9 @@ class PlaybackOffer(BaseModel):
     未发现不可播, 但**不保证点播一定成功** —— 文件可能在探测之后消失, 上游也可能此时取不到流,
     那种失败由 ``resolve`` 以自己的原因报出. 「列出来但没写原因」会让整块播放区消失, 比列出来并
     说明原因更差.
+
+    ``actions`` 是与取流无关的可选操作 (例如启动本机外部程序). 主机把它们暴露为按钮;
+    点按调用 ``PlaybackProvider.action``, 不经过 ``resolve``, 也不写入解析结果缓存.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -140,6 +155,7 @@ class PlaybackOffer(BaseModel):
     seekable: bool = True
     unavailable: str | None = Field(default=None, min_length=1)
     subtitles: tuple[SubtitleTrack, ...] = ()
+    actions: tuple[PlaybackAction, ...] = ()
 
 
 # 解析结果的可复用时长 (秒): 有穷正数. ``None`` 表示不缓存.
@@ -292,6 +308,14 @@ class PlaybackProvider(ABC):
     async def subtitle(self, query: PlaybackQuery, track_id: str) -> str | UpstreamPlaybackTarget | None:
         """Return WebVTT text, an upstream VTT URL, or ``None`` if the track is absent."""
         return None
+
+    async def action(self, query: PlaybackQuery, action_id: str) -> None:
+        """执行 ``probe`` 声明的可选操作; 与取流正交, 缺省拒绝.
+
+        ``query.selected_key`` 是用户选中的流. 未实现的 ``action_id`` 必须抛
+        ``SourceError(NO_USABLE_METADATA)``, 不允许静默成功. 阻塞 I/O 须经 ``asyncio.to_thread``.
+        """
+        raise SourceError(FailureReason.NO_USABLE_METADATA, detail="不支持此操作")
 
 
 @dataclass(frozen=True, slots=True)

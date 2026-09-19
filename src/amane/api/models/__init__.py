@@ -49,6 +49,7 @@ from .metadata import (
     PartialMetadata,
 )
 from .playback import (
+    PlaybackActionItem,
     PlaybackSourceListResponse,
     PlaybackSourceOption,
     PlaybackStreamItem,
@@ -135,10 +136,12 @@ __all__ = [
     "PartialMetadata",
     "PathTemplatePlaceholder",
     "PathTemplateSchemaResponse",
+    "PlaybackActionItem",
     "PlaybackSourceListResponse",
     "PlaybackSourceOption",
     "PlaybackStreamItem",
     "PlaybackStreamListResponse",
+    "PlaybackSubtitleItem",
     "PluginConfigUpdate",
     "PluginListResponse",
     "PluginResponse",

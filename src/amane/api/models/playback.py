@@ -10,6 +10,16 @@ class PlaybackSubtitleItem(BaseModel):
     href: str
 
 
+class PlaybackActionItem(BaseModel):
+    """流上的一条可选操作. ``label`` 原样来自插件; ``href`` 由主机拼好供 POST."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+    href: str
+
+
 class PlaybackSourceOption(BaseModel):
     """一个可选的播放源. 只有名字, 不含探测结果: 切到它时才去问它有哪些流."""
 
@@ -36,6 +46,7 @@ class PlaybackStreamItem(BaseModel):
     detail: str | None = None
     href: str
     subtitles: list[PlaybackSubtitleItem] = Field(default_factory=list)
+    actions: list[PlaybackActionItem] = Field(default_factory=list)
 
 
 class PlaybackSourceListResponse(BaseModel):

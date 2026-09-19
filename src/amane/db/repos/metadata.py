@@ -23,6 +23,7 @@ from ..models import (
 )
 from ..repo_types import (
     MetadataFields,
+    _media_file_is_strm_predicate,
     _media_file_uncensored_predicate,
     _metadata_has_files_clause,
     _metadata_linked_file_exists,
@@ -61,12 +62,13 @@ class MetadataRepoMixin(RepositoryMixinBase):
         uncensored: bool | None = None,
         definition: str | None = None,
         content_type: ContentType | None = None,
+        is_strm: bool | None = None,
         ids: Sequence[int] | None = None,
         id_subquery_sql: str | None = None,
         updated_before: datetime | None = None,
     ) -> tuple[list[Metadata], int]:
         """关联类 facet 同 kind 多 id 为 AND; 标量类同 kind 多 id 为 OR (未知 id 忽略, 全部未知则空).
-        跨 kind 始终 AND. 相位筛选项: 布尔 True=至少一份具备, False=没有任何一份具备.
+        跨 kind 始终 AND. 相位 / is_strm 筛选项: 布尔 True=至少一份具备, False=没有任何一份具备.
         """
         async with self._session() as session:
             base = select(Metadata)
@@ -133,6 +135,10 @@ class MetadataRepoMixin(RepositoryMixinBase):
                 base = base.where(_metadata_linked_file_exists(col(MediaFile.definition) == definition))
             if content_type is not None:
                 base = base.where(_metadata_linked_file_exists(col(MediaFile.content_type) == content_type))
+            if is_strm is True:
+                base = base.where(_metadata_linked_file_exists(_media_file_is_strm_predicate()))
+            elif is_strm is False:
+                base = base.where(~_metadata_linked_file_exists(_media_file_is_strm_predicate()))
             if updated_before is not None:
                 base = base.where(col(Metadata.updated_at) < updated_before)
 

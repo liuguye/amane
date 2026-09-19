@@ -87,6 +87,9 @@ async def list_metadata(
     ] = None,
     definition: Annotated[str | None, Query(description="Filter by linked file definition (8K/4K/1080p/…)")] = None,
     content_type: Annotated[ContentType | None, Query(description="Filter by linked file content type")] = None,
+    is_strm: Annotated[
+        bool | None, Query(description="Filter by linked file path ending with .strm (case-insensitive)")
+    ] = None,
     saved_query_id: Annotated[
         int | None, Query(description="Saved query preset id; AND with other filters via SQL subquery")
     ] = None,
@@ -114,6 +117,7 @@ async def list_metadata(
         uncensored=uncensored,
         definition=definition,
         content_type=content_type,
+        is_strm=is_strm,
         id_subquery_sql=id_subquery_sql,
     )
     summaries = await repo.summarize_media_by_metadata_ids([m.id for m in items if m.id is not None])

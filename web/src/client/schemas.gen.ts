@@ -4746,6 +4746,32 @@ export const PathTemplateSchemaResponseSchema = {
     description: '与 resolve_paths 同源.'
 } as const;
 
+export const PlaybackActionItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        href: {
+            type: 'string',
+            title: 'Href'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'id',
+        'label',
+        'href'
+    ],
+    title: 'PlaybackActionItem',
+    description: '流上的一条可选操作. ``label`` 原样来自插件; ``href`` 由主机拼好供 POST.'
+} as const;
+
 export const PlaybackSourceListResponseSchema = {
     properties: {
         items: {
@@ -4836,6 +4862,13 @@ export const PlaybackStreamItemSchema = {
             },
             type: 'array',
             title: 'Subtitles'
+        },
+        actions: {
+            items: {
+                $ref: '#/components/schemas/PlaybackActionItem'
+            },
+            type: 'array',
+            title: 'Actions'
         }
     },
     additionalProperties: false,

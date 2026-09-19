@@ -340,6 +340,24 @@
             "description": "Filter by content type"
           },
           {
+            "name": "is_strm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by path ending with .strm (case-insensitive)",
+              "title": "Is Strm"
+            },
+            "description": "Filter by path ending with .strm (case-insensitive)"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -880,6 +898,24 @@
               "title": "Content Type"
             },
             "description": "Filter by linked file content type"
+          },
+          {
+            "name": "is_strm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by linked file path ending with .strm (case-insensitive)",
+              "title": "Is Strm"
+            },
+            "description": "Filter by linked file path ending with .strm (case-insensitive)"
           },
           {
             "name": "saved_query_id",
@@ -1796,6 +1832,126 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playback/{source_id}/{metadata_id}/actions/{action_id}": {
+      "post": {
+        "tags": [
+          "playback"
+        ],
+        "summary": "Run Metadata Action",
+        "operationId": "run_metadata_action",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "metadata_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Metadata Id"
+            }
+          },
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9._-]{1,64}$",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playback/{source_id}/{metadata_id}/streams/{key}/actions/{action_id}": {
+      "post": {
+        "tags": [
+          "playback"
+        ],
+        "summary": "Run Stream Action",
+        "operationId": "run_stream_action",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "metadata_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Metadata Id"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9._-]{1,64}$",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9._-]{1,64}$",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -10300,6 +10456,31 @@
         "title": "PathTemplateSchemaResponse",
         "description": "与 resolve_paths 同源."
       },
+      "PlaybackActionItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "href": {
+            "type": "string",
+            "title": "Href"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "href"
+        ],
+        "title": "PlaybackActionItem",
+        "description": "流上的一条可选操作. ``label`` 原样来自插件; ``href`` 由主机拼好供 POST."
+      },
       "PlaybackSourceListResponse": {
         "properties": {
           "items": {
@@ -10388,6 +10569,13 @@
             },
             "type": "array",
             "title": "Subtitles"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/PlaybackActionItem"
+            },
+            "type": "array",
+            "title": "Actions"
           }
         },
         "additionalProperties": false,

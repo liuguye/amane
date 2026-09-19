@@ -16,6 +16,7 @@ from ..plugins.api import (
     FilePlaybackTarget,
     HlsLocator,
     HlsPlaybackTarget,
+    PlaybackAction,
     PlaybackOffer,
     PlaybackProvider,
     PlaybackQuery,
@@ -44,6 +45,29 @@ if TYPE_CHECKING:
     from ..plugins.manager import PluginManager
 
 logger = structlog.get_logger()
+
+
+def _dedupe_actions(
+    source_id: str,
+    stream_key: str,
+    actions: tuple[PlaybackAction, ...],
+) -> tuple[PlaybackAction, ...]:
+    """同一流内重复的 action id 丢弃后一条并记日志, 对齐重复 key 的处理."""
+    kept: list[PlaybackAction] = []
+    seen: set[str] = set()
+    for action in actions:
+        if action.id in seen:
+            logger.warning(
+                "playback duplicate action id",
+                source=source_id,
+                key=stream_key,
+                action=action.id,
+            )
+            continue
+        seen.add(action.id)
+        kept.append(action)
+    return tuple(kept)
+
 
 SOURCE_ID_MAX_LEN = 128
 
@@ -111,6 +135,7 @@ class ListedSource:
     available: bool
     detail: str | None = None
     subtitles: tuple[SubtitleTrack, ...] = ()
+    actions: tuple[PlaybackAction, ...] = ()
 
 
 @dataclass(slots=True)
@@ -269,6 +294,7 @@ class PlaybackFactory:
             available=offer.unavailable is None,
             detail=offer.unavailable,
             subtitles=offer.subtitles,
+            actions=_dedupe_actions(source_id, offer.key, offer.actions),
         )
 
     def _listed_all(self, source_id: str, offers: tuple[PlaybackOffer, ...]) -> list[ListedSource]:
@@ -379,6 +405,22 @@ class PlaybackFactory:
         if ttl is not None:
             self._caches.resolve_hits.put(open_key, target, ttl=min(ttl, RESOLVE_TTL_MAX_SECONDS))
         return target
+
+    async def invoke_action(self, source_id: str, query: PlaybackQuery, action_id: str) -> None:
+        """执行插件声明的可选操作; 不写入解析结果缓存.
+
+        ``SourceError`` 原样抛出由路由转 502. 其它异常记日志后归一为网络类失败.
+        """
+        provider = self.provider(source_id)
+        if provider is None:
+            raise LookupError(source_id)
+        try:
+            await provider.action(query, action_id)
+        except SourceError:
+            raise
+        except Exception:
+            logger.exception("playback action crashed", source=source_id, action=action_id)
+            raise SourceError(FailureReason.NETWORK, detail="执行操作失败") from None
 
     def _map_hls_uri(
         self,

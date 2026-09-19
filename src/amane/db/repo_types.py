@@ -93,6 +93,11 @@ def _media_file_uncensored_predicate() -> ColumnElement[bool]:
     return or_(col(MediaFile.mosaic) == Mosaic.UNCENSORED, col(MediaFile.content_type) == ContentType.UNCENSORED)
 
 
+def _media_file_is_strm_predicate() -> ColumnElement[bool]:
+    """路径后缀是否为 .strm (大小写不敏感); 不落库, 查询时按 path 判定."""
+    return func.lower(col(MediaFile.path)).endswith(".strm")
+
+
 def _apply_media_phase_filters(
     stmt: SelectOfScalar[MediaFile],
     *,
@@ -101,8 +106,9 @@ def _apply_media_phase_filters(
     uncensored: bool | None = None,
     definition: str | None = None,
     content_type: ContentType | None = None,
+    is_strm: bool | None = None,
 ) -> SelectOfScalar[MediaFile]:
-    """None 表示该相位不过滤."""
+    """None 表示该相位不过滤. is_strm 按 path 后缀判定, 不是相位列."""
     if has_subtitle is not None:
         stmt = stmt.where(col(MediaFile.has_subtitle) == has_subtitle)
     if mosaic is not None:
@@ -114,6 +120,9 @@ def _apply_media_phase_filters(
         stmt = stmt.where(col(MediaFile.definition) == definition)
     if content_type is not None:
         stmt = stmt.where(col(MediaFile.content_type) == content_type)
+    if is_strm is not None:
+        flag = _media_file_is_strm_predicate()
+        stmt = stmt.where(flag if is_strm else ~flag)
     return stmt
 
 

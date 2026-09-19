@@ -18,6 +18,7 @@ from amane.plugins.api import (
     HlsLocator,
     HlsPlaybackTarget,
     HlsPlaylist,
+    PlaybackAction,
     PlaybackMediaFile,
     PlaybackOffer,
     PlaybackPlugin,
@@ -55,6 +56,7 @@ _REEXPORTS: tuple[tuple[str, object], ...] = (
     ("HttpClient", HttpClient),
     ("Language", Language),
     ("MediaMetadata", MediaMetadata),
+    ("PlaybackAction", PlaybackAction),
     ("PlaybackMediaFile", PlaybackMediaFile),
     ("PlaybackOffer", PlaybackOffer),
     ("PlaybackPlugin", PlaybackPlugin),
@@ -85,6 +87,7 @@ def test_path_segment_ids_accept_path_safe_values(value: str) -> None:
     """
     assert PlaybackOffer(key=value, name="n", content_type="video/mp4").key == value
     assert SubtitleTrack(id=value, label="l").id == value
+    assert PlaybackAction(id=value, label="l").id == value
 
 
 @pytest.mark.parametrize("value", ["", ".", "..", "../up", "a/b", "a b", "x" * 65])
@@ -94,6 +97,8 @@ def test_path_segment_ids_reject_unsafe_values(value: str) -> None:
         PlaybackOffer(key=value, name="n", content_type="video/mp4")
     with pytest.raises(ValidationError):
         SubtitleTrack(id=value, label="l")
+    with pytest.raises(ValidationError):
+        PlaybackAction(id=value, label="l")
 
 
 def test_playback_offer_availability_is_derived_from_reason() -> None:

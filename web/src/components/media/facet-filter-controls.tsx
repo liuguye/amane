@@ -20,6 +20,7 @@ export type HasFilesFilter = boolean | null;
 export type FilePhaseFilters = {
   has_subtitle: HasFilesFilter;
   uncensored: HasFilesFilter;
+  is_strm: HasFilesFilter;
   mosaic: Mosaic | null;
   definition: (typeof FILE_DEFINITIONS)[number] | null;
   content_type: ContentType | null;
@@ -174,6 +175,18 @@ export function FacetFilterControls({
             data={triData}
             value={triSelectValue(filePhase.has_subtitle)}
             onChange={(v) => onFilePhaseChange({ ...filePhase, has_subtitle: parseTriSelect(v) })}
+            clearable
+            size="sm"
+          />
+          <Select
+            label={t("search.isStrm")}
+            placeholder={t("search.any")}
+            data={[
+              { value: "true", label: t("search.isStrmYes") },
+              { value: "false", label: t("search.isStrmNo") },
+            ]}
+            value={triSelectValue(filePhase.is_strm)}
+            onChange={(v) => onFilePhaseChange({ ...filePhase, is_strm: parseTriSelect(v) })}
             clearable
             size="sm"
           />

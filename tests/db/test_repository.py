@@ -211,6 +211,20 @@ class TestMediaFileRepo:
         assert [f.path for f in heyzo] == ["/v/HEYZO-1234.mp4"]
         assert await repo.count_media_files(uncensored=True) == 2
 
+        await repo.create_media_file(library_id=1, path="/v/MIDV-004.strm")
+        await repo.create_media_file(library_id=1, path="/v/MIDV-005.STRM")
+        strm = await repo.list_media_files(is_strm=True, limit=None)
+        assert {f.path for f in strm} == {"/v/MIDV-004.strm", "/v/MIDV-005.STRM"}
+        non_strm = await repo.list_media_files(is_strm=False, limit=None)
+        assert {f.path for f in non_strm} == {
+            "/v/MIDV-001-C.mp4",
+            "/v/MIDV-002-无码.mp4",
+            "/v/HEYZO-1234.mp4",
+            "/v/MIDV-003-U.mp4",
+        }
+        assert await repo.count_media_files(is_strm=True) == 2
+        assert await repo.count_media_files(is_strm=False) == 4
+
     @pytest.mark.asyncio(loop_scope="function")
     async def test_update_media_file_not_found(self, repo: Repository):
         result = await repo.update_media_file(9999, path="/x.mp4")
@@ -661,6 +675,21 @@ class TestMetadataRepo:
         items, total = await repo.list_metadata(content_type=ContentType.UNCENSORED)
         assert total == 1
         assert items[0].number == "HEYZO-1"
+
+        strm_meta = await repo.upsert_metadata(number="STRM-1")
+        mp4_meta = await repo.upsert_metadata(number="MP4-1")
+        assert strm_meta.id and mp4_meta.id
+        m_strm = await repo.create_media_file(library_id=1, path="/v/STRM-1.strm")
+        m_mp4 = await repo.create_media_file(library_id=1, path="/v/MP4-1.mp4")
+        assert m_strm.id and m_mp4.id
+        await repo.update_media_file(m_strm.id, metadata_id=strm_meta.id)
+        await repo.update_media_file(m_mp4.id, metadata_id=mp4_meta.id)
+
+        items, total = await repo.list_metadata(is_strm=True)
+        assert total == 1
+        assert items[0].number == "STRM-1"
+        items, total = await repo.list_metadata(is_strm=False, sort_by=MetadataSortField.NUMBER, order=SortOrder.ASC)
+        assert [m.number for m in items] == ["HEYZO-1", "MP4-1", "PLAIN-1", "SUB-1", "U-1"]
 
         summaries = await repo.summarize_media_by_metadata_ids([sub.id, u_file.id, heyzo.id, plain.id])
         assert summaries[sub.id].file_count == 1

@@ -72,6 +72,7 @@ const metaSearchSchema = z.object({
   has_files: z.enum(["true", "false"]).optional(),
   has_subtitle: z.enum(["true", "false"]).optional(),
   uncensored: z.enum(["true", "false"]).optional(),
+  is_strm: z.enum(["true", "false"]).optional(),
   mosaic: z.enum(MOSAICS).optional(),
   definition: z.enum(FILE_DEFINITIONS).optional(),
   content_type: z.enum(CONTENT_TYPES).optional(),
@@ -164,6 +165,7 @@ function MetaIndexPage() {
   const filePhase: FilePhaseFilters = {
     has_subtitle: parseHasFiles(search.has_subtitle),
     uncensored: parseHasFiles(search.uncensored),
+    is_strm: parseHasFiles(search.is_strm),
     mosaic: search.mosaic ?? null,
     definition: search.definition ?? null,
     content_type: search.content_type ?? null,
@@ -171,6 +173,7 @@ function MetaIndexPage() {
   const phaseActive =
     filePhase.has_subtitle !== null ||
     filePhase.uncensored !== null ||
+    filePhase.is_strm !== null ||
     filePhase.mosaic != null ||
     filePhase.definition != null ||
     filePhase.content_type != null;
@@ -195,6 +198,7 @@ function MetaIndexPage() {
     has_files: hasFiles === null ? undefined : hasFiles,
     has_subtitle: filePhase.has_subtitle === null ? undefined : filePhase.has_subtitle,
     uncensored: filePhase.uncensored === null ? undefined : filePhase.uncensored,
+    is_strm: filePhase.is_strm === null ? undefined : filePhase.is_strm,
     mosaic: filePhase.mosaic ?? undefined,
     definition: filePhase.definition ?? undefined,
     content_type: filePhase.content_type ?? undefined,
@@ -302,6 +306,7 @@ function MetaIndexPage() {
         ...prev,
         has_subtitle: triToSearch(value.has_subtitle),
         uncensored: triToSearch(value.uncensored),
+        is_strm: triToSearch(value.is_strm),
         mosaic: value.mosaic ?? undefined,
         definition: value.definition ?? undefined,
         content_type: value.content_type ?? undefined,
@@ -452,6 +457,12 @@ function MetaIndexPage() {
             <ActiveTriChip
               label={`${t("search.hasSubtitle")}: ${filePhase.has_subtitle ? t("search.yes") : t("search.no")}`}
               onClear={() => setFilePhaseFilter({ ...filePhase, has_subtitle: null })}
+            />
+          )}
+          {filePhase.is_strm !== null && (
+            <ActiveTriChip
+              label={`${t("search.isStrm")}: ${filePhase.is_strm ? t("search.isStrmYes") : t("search.isStrmNo")}`}
+              onClear={() => setFilePhaseFilter({ ...filePhase, is_strm: null })}
             />
           )}
           {filePhase.uncensored !== null && (

@@ -38,6 +38,7 @@ async def list_media(
     ] = None,
     definition: Annotated[str | None, Query(description="Filter by definition (8K/4K/1080p/…)")] = None,
     content_type: Annotated[ContentType | None, Query(description="Filter by content type")] = None,
+    is_strm: Annotated[bool | None, Query(description="Filter by path ending with .strm (case-insensitive)")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     sort_by: Annotated[MediaSortField, Query(description="Sort field")] = MediaSortField.UPDATED_AT,
@@ -58,6 +59,7 @@ async def list_media(
         uncensored=uncensored,
         definition=definition,
         content_type=content_type,
+        is_strm=is_strm,
     )
     total = await repo.count_media_files(
         status=status_filter,
@@ -68,6 +70,7 @@ async def list_media(
         uncensored=uncensored,
         definition=definition,
         content_type=content_type,
+        is_strm=is_strm,
     )
     return MediaListResponse(items=[to_resp(MediaFileResponse, m) for m in items], total=total)
 

@@ -12,6 +12,7 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { IconChevronDown } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -291,6 +292,7 @@ export function PlaybackPanel({
   const [pickedSourceId, setPickedSourceId] = useState<string | null>(null);
   const [pickedStream, setPickedStream] = useState<{ sourceId: string; key: string } | null>(null);
   const [error, setError] = useState<{ href: string; message: string } | null>(null);
+  const [actionPendingId, setActionPendingId] = useState<string | null>(null);
 
   // 来源列表变化后原选择可能不存在 (来源被停用或卸载), 回落到第一个来源.
   const source = sources.find((item) => item.source_id === pickedSourceId) ?? sources[0];
@@ -333,6 +335,34 @@ export function PlaybackPanel({
     kind !== "other";
 
   const playerFrameRef = useRef<HTMLDivElement>(null);
+
+  async function runStreamAction(href: string, actionId: string): Promise<void> {
+    setActionPendingId(actionId);
+    try {
+      const response = await apiFetch(href, { method: "POST" });
+      if (response.ok) {
+        notifications.show({ message: t("detail.playbackActionDone"), color: "blue" });
+        return;
+      }
+      let detail: unknown;
+      try {
+        detail = (await response.json()) as unknown;
+      } catch {
+        detail = null;
+      }
+      notifications.show({
+        message: extractErrorMessage(detail, t("detail.playbackActionFailed")),
+        color: "red",
+      });
+    } catch (error) {
+      notifications.show({
+        message: extractErrorMessage(error, t("detail.playbackActionFailed")),
+        color: "red",
+      });
+    } finally {
+      setActionPendingId(null);
+    }
+  }
 
   useEffect(() => {
     onCanSeekChange(canSeek);
@@ -395,6 +425,24 @@ export function PlaybackPanel({
     />
   ) : null;
 
+  const actionButtons =
+    selected == null || selected.actions == null || selected.actions.length === 0
+      ? null
+      : selected.actions.map((action) => (
+          <Button
+            key={action.id}
+            size="compact-xs"
+            variant="light"
+            disabled={!selected.available || actionPendingId != null}
+            loading={actionPendingId === action.id}
+            onClick={() => {
+              void runStreamAction(action.href, action.id);
+            }}
+          >
+            {action.label}
+          </Button>
+        ));
+
   return (
     <Card withBorder radius="md" p="md">
       <Stack gap="xs">
@@ -414,6 +462,7 @@ export function PlaybackPanel({
               </Text>
             )}
             {streamPicker}
+            {actionButtons}
           </Group>
         </Group>
         {/* 播放窗口常驻: 探测中、出错、类型不支持都在同一外框内呈现, 页面高度不随状态突变. */}

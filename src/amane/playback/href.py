@@ -26,3 +26,7 @@ def hls_part_href(source_id: str, metadata_id: int, key: str | None, token: str)
 
 def subtitle_href(source_id: str, metadata_id: int, key: str | None, track_id: str) -> str:
     return f"{stream_href(source_id, metadata_id, key)}/subtitles/{track_id}"
+
+
+def action_href(source_id: str, metadata_id: int, key: str | None, action_id: str) -> str:
+    return f"{stream_href(source_id, metadata_id, key)}/actions/{action_id}"

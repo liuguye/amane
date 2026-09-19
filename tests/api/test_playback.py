@@ -215,6 +215,87 @@ class Plugin(PlaybackPlugin):
         return _Provider(context.data_dir)
 """
 
+# ``resolve`` 与 ``action`` 计数分离, 断言取流不触发操作、点按钮不触发解析.
+_ACTION_PLUGIN = """
+from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict
+
+from amane.plugin import (
+    FailureReason,
+    FilePlaybackTarget,
+    PlaybackAction,
+    PlaybackOffer,
+    PlaybackPlugin,
+    PlaybackProvider,
+    PlaybackQuery,
+    PluginContext,
+    SourceCapability,
+    SourceDescriptor,
+    SourceError,
+)
+
+RESOLVE_COUNT = "resolve-count.txt"
+ACTION_COUNT = "action-count.txt"
+LAST_ACTION = "last-action.txt"
+
+
+class _Config(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fail_action: bool = False
+
+
+class _Provider(PlaybackProvider):
+    def __init__(self, data_dir: Path, config: _Config) -> None:
+        self._data_dir = data_dir
+        self._config = config
+
+    def _bump(self, name: str) -> None:
+        path = self._data_dir / name
+        count = int(path.read_text(encoding="utf-8")) if path.exists() else 0
+        path.write_text(str(count + 1), encoding="utf-8")
+
+    async def probe(self, query: PlaybackQuery) -> tuple[PlaybackOffer, ...]:
+        return (
+            PlaybackOffer(
+                key="main",
+                name="Actionable",
+                content_type="video/mp4",
+                actions=(PlaybackAction(id="open", label="打开外部"),),
+            ),
+        )
+
+    async def resolve(self, query: PlaybackQuery):
+        self._bump(RESOLVE_COUNT)
+        media = query.files[0]
+        return FilePlaybackTarget(path=Path(media.path), content_type="video/mp4", cache_ttl=120.0)
+
+    async def action(self, query: PlaybackQuery, action_id: str) -> None:
+        self._bump(ACTION_COUNT)
+        (self._data_dir / LAST_ACTION).write_text(action_id, encoding="utf-8")
+        if action_id != "open":
+            raise SourceError(FailureReason.NO_USABLE_METADATA, detail="不支持此操作")
+        if self._config.fail_action:
+            raise SourceError(FailureReason.NO_USABLE_METADATA, detail="外部程序不可用")
+
+
+class Plugin(PlaybackPlugin):
+    config_model = _Config
+
+    @classmethod
+    def descriptor(cls) -> SourceDescriptor:
+        return SourceDescriptor(
+            id="acme.action",
+            name="Action playback",
+            version="0.1.0",
+            capabilities=frozenset({SourceCapability.PLAYBACK}),
+            urls=("https://play.example.test",),
+        )
+
+    def build_playback(self, context: PluginContext, config: BaseModel) -> PlaybackProvider:
+        return _Provider(context.data_dir, config)
+"""
+
 # ``resolve`` 调用次数落在插件自己的运行数据目录; ``cache_ttl`` 由插件按配置逐次声明.
 _CACHING_PLUGIN = """
 from pathlib import Path
@@ -1387,3 +1468,92 @@ class TestResolveCache:
             assert _resolve_count(app) == 2
         finally:
             server.shutdown()
+
+
+class TestPlaybackAction:
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_action_orthogonal_to_resolve(
+        self,
+        client: AsyncClient,
+        repo: Repository,
+        app: FastAPI,
+        tmp_path: Path,
+    ) -> None:
+        """取流只增加 resolve 计数; POST action 只增加 action 计数, 且 streams 带出 href."""
+        data_dir = app.state.runtime.config.cold.data_dir
+        write_plugin(data_dir, "acme.action", body=_ACTION_PLUGIN)
+        reloaded = await client.post("plugins/reload")
+        assert reloaded.status_code == 200, reloaded.text
+        enabled = await client.patch("plugins/acme.action", json={"enabled": True, "config": {}})
+        assert enabled.status_code == 200, enabled.text
+
+        metadata_id = await _seed_title(repo, number="PLAY-ACTION")
+        media_path = tmp_path / "clip.mp4"
+        await _attach_file(repo, metadata_id, media_path, payload=b"CLIPBYTES")
+
+        streams = await _streams(client, "acme.action", metadata_id)
+        assert len(streams) == 1
+        raw_actions = streams[0]["actions"]
+        assert isinstance(raw_actions, list)
+        assert len(raw_actions) == 1
+        action = raw_actions[0]
+        assert isinstance(action, dict)
+        href = action["href"]
+        assert isinstance(href, str)
+        assert action == {
+            "id": "open",
+            "label": "打开外部",
+            "href": f"/api/playback/acme.action/{metadata_id}/streams/main/actions/open",
+        }
+
+        resolve_counter = data_dir / "plugins" / "acme.action" / "resolve-count.txt"
+        action_counter = data_dir / "plugins" / "acme.action" / "action-count.txt"
+        last_action = data_dir / "plugins" / "acme.action" / "last-action.txt"
+
+        played = await client.get(f"playback/acme.action/{metadata_id}/streams/main")
+        assert played.status_code == 200, played.text
+        assert played.content == b"CLIPBYTES"
+        assert resolve_counter.read_text(encoding="utf-8") == "1"
+        assert not action_counter.exists()
+
+        opened = await client.post(href.removeprefix("/api/"))
+        assert opened.status_code == 204, opened.text
+        assert action_counter.read_text(encoding="utf-8") == "1"
+        assert last_action.read_text(encoding="utf-8") == "open"
+        assert resolve_counter.read_text(encoding="utf-8") == "1"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    @pytest.mark.parametrize(
+        ("action_id", "fail_action", "detail"),
+        [
+            ("unknown", False, "不支持此操作"),
+            ("open", True, "外部程序不可用"),
+        ],
+    )
+    async def test_action_failures_are_502(
+        self,
+        client: AsyncClient,
+        repo: Repository,
+        app: FastAPI,
+        tmp_path: Path,
+        action_id: str,
+        fail_action: bool,
+        detail: str,
+    ) -> None:
+        """未知 action_id 与插件抛 SourceError 均 502, detail 可读."""
+        data_dir = app.state.runtime.config.cold.data_dir
+        write_plugin(data_dir, "acme.action", body=_ACTION_PLUGIN)
+        reloaded = await client.post("plugins/reload")
+        assert reloaded.status_code == 200, reloaded.text
+        enabled = await client.patch(
+            "plugins/acme.action",
+            json={"enabled": True, "config": {"fail_action": fail_action}},
+        )
+        assert enabled.status_code == 200, enabled.text
+
+        metadata_id = await _seed_title(repo, number=f"PLAY-ACT-{action_id}-{fail_action}")
+        await _attach_file(repo, metadata_id, tmp_path / "clip.mp4", payload=b"CLIP")
+
+        response = await client.post(f"playback/acme.action/{metadata_id}/streams/main/actions/{action_id}")
+        assert response.status_code == 502, response.text
+        assert response.json()["detail"] == detail
